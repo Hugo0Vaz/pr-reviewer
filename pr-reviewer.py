@@ -11,9 +11,21 @@
 import typer
 import requests
 import base64
+import tiktoken
 
 from typer.params import Option
 from typing_extensions import Annotated
+
+DEBUG = False
+
+
+def count_tokens(message: str) -> int:
+    """ returns the count of tokens of the given message """
+
+    encoding = tiktoken.encoding_for_model("gpt-3.5-turbo")
+    tokens = encoding.encode(message)
+
+    return len(tokens)
 
 
 def string_to_base64(s):
@@ -55,7 +67,6 @@ def get_pr_file_list(pr_number: str, repo_ownr: str, repo_name: str, gh_token: s
         raise Exception(f"Error fetching pull request: {response.status_code}")
 
     for file in response.json():
-        print(file['filename'])
         file_list.append(
             (
                 file['filename'],
@@ -83,11 +94,13 @@ def get_pr_data(pr_number: str, repo_ownr: str, repo_name: str, gh_token: str) -
 
 def printout(fstring: str, mode: bool):
     """ prints out if set to verbose """
-    if mode:
+
+    output = mode | DEBUG
+    if output:
         print(fstring)
 
 
-def print_script_signature(pr_number, repo_ownr, repo_name, verbose):
+def print_script_signature(pr_number: str, repo_ownr: str, repo_name: str, verbose: bool):
     """ prints the program signature """
 
     signature = f'\nRunning reviews on PR #{pr_number} in {repo_ownr}/{repo_name}...\n'
@@ -120,10 +133,39 @@ def main(
         help="Option to enable verbose mode")] = False,
 
     max_files: int = Option(
-        30, help="Option to set the max number of files reviewed")
+        30, help="Option to set the max number of files reviewed"),
+    max_tokens: int = Option(
+        4096, help="Option to set the max number of tokens"),
+    max_input_tokens: int = Option(
+        4096, help="Option to set the max number of input tokens"),
+    max_input_tokens_pf: int = Option(
+        4096, help="Option to set the max number of input tokens per file"),
 ):
 
-    print_script_signature(pr_number, repo_ownr, repo_name, verbose)
+    global DEBUG
+    DEBUG = debug
+
+    print_script_signature(str(pr_number), repo_ownr, repo_name, verbose)
+
+    if debug:
+        print("PROGRAM CALL")
+        print(f'\tpr_number: {pr_number}')
+        print(f'\trepo_ownr: {repo_ownr}')
+        print(f'\trepo_name: {repo_name}')
+        print(f'\tgh_token:  {gh_token}')
+        print(f'\treview_title: {review_title}')
+        print(f'\treview_body: {review_body}')
+        print(f'\treview_diffs: {review_diffs}')
+        print(f'\tverbose: {verbose}')
+        print(f'\tdebug: {debug}')
+        print('\n')
+
+    if max_input_tokens > max_tokens:
+        print("!!!ERROR: `max_input_tokens > max_tokens`\n")
+        exit(1)
+
+    if max_input_tokens == max_tokens:
+        print("!!!WARN: `max_input_tokens = max_tokens` (not recommended)\n")
 
     pr_title: str
     pr_body: str
@@ -146,13 +188,13 @@ def main(
 
     if review_diffs != False:
         printout("Reviewing the files:", verbose)
-        printout(f'\tThe max_files is set to: {max_files}', verbose)
 
         changed_files = get_pr_file_list(
             str(pr_number), repo_ownr, repo_name, gh_token)
 
         for file in changed_files:
-            # print()
+            # TODO: implement file review code
+            pass
 
 
 if __name__ == '__main__':
